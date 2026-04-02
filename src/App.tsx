@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Wallet, CreditCard, Coins, ArrowDownCircle, PiggyBank, Receipt, Trash2, X, Star, Heart, Sparkles, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Wallet, CreditCard, Coins, ArrowDownCircle, PiggyBank, Receipt, Trash2, X, Star, Heart, Sparkles, Calendar as CalendarIcon, Info } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import { Transaction, TransactionType, ExpenseCategory, PaymentMethod } from './types';
 
 const getCurrentMonth = () => {
@@ -21,18 +22,25 @@ export default function App() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [budgetInput, setBudgetInput] = useState('');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem('budgets', JSON.stringify(budgets));
     localStorage.setItem('transactions', JSON.stringify(transactions));
   }, [budgets, transactions]);
 
-  const monthTransactions = useMemo(() => {
-    return transactions.filter(t => t.date.startsWith(currentMonth)).sort((a, b) => b.date.localeCompare(a.date));
-  }, [transactions, currentMonth]);
+  const filteredTransactions = useMemo(() => {
+    let filtered = transactions.filter(t => t.date.startsWith(currentMonth));
+    if (selectedDate) {
+      filtered = filtered.filter(t => t.date === selectedDate);
+    }
+    return filtered.sort((a, b) => b.date.localeCompare(a.date));
+  }, [transactions, currentMonth, selectedDate]);
 
   const { totalIncome, totalExpense, totalConsumption, totalSavings, totalCard, totalCash, totalFixed, totalFixedCard, totalFixedCash } = useMemo(() => {
-    return monthTransactions.reduce(
+    // Stats always show for the full month for context
+    const monthTxs = transactions.filter(t => t.date.startsWith(currentMonth));
+    return monthTxs.reduce(
       (acc, t) => {
         if (t.type === 'income') {
           acc.totalIncome += t.amount;
@@ -56,7 +64,7 @@ export default function App() {
       },
       { totalIncome: 0, totalExpense: 0, totalConsumption: 0, totalSavings: 0, totalCard: 0, totalCash: 0, totalFixed: 0, totalFixedCard: 0, totalFixedCash: 0 }
     );
-  }, [monthTransactions]);
+  }, [transactions, currentMonth]);
 
   const baseBudget = budgets[currentMonth] || 0;
   const remainingBudget = baseBudget - totalConsumption;
@@ -210,7 +218,7 @@ export default function App() {
               </div>
               <div className="col-span-2 bg-[#ffebd6] rounded-3xl p-4 border-2 border-white shadow-[0_4px_15px_rgba(255,218,185,0.5)] flex flex-col items-center text-center space-y-2 hover:-translate-y-1 transition-transform">
                 <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#ff8c00] shadow-sm mb-1">
-                  <Calendar className="w-5 h-5" strokeWidth={2.5} />
+                  <CalendarIcon className="w-5 h-5" strokeWidth={2.5} />
                 </div>
                 <div className="text-xs font-bold text-[#d2691e] bg-white/50 px-3 py-1 rounded-full">고정지출</div>
                 <div className="flex flex-col items-center">
@@ -222,22 +230,148 @@ export default function App() {
               </div>
             </section>
 
+            {/* Y2K Calendar Section */}
+            <section className="bg-white/60 backdrop-blur-sm border-2 border-[#ffe4e1] rounded-[2rem] p-5 shadow-[0_8px_25px_rgba(255,182,193,0.15)]">
+              <div className="flex items-center justify-between mb-4 px-1">
+                <h3 className="text-sm font-bold text-[#ff8da1] flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4" /> ♡ 소비 달력 ♡
+                </h3>
+                <div className="text-[10px] font-bold text-[#ffb6c1] bg-[#fff0f5] px-2 py-0.5 rounded-full">
+                  날짜를 눌러봐!
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {['일', '월', '화', '수', '목', '금', '토'].map((day, i) => (
+                  <div key={day} className={`text-center text-[10px] font-black mb-2 ${i === 0 ? 'text-[#ff8da1]' : i === 6 ? 'text-[#87ceeb]' : 'text-[#aaa]'}`}>
+                    {day}
+                  </div>
+                ))}
+                {(() => {
+                  const [year, month] = currentMonth.split('-').map(Number);
+                  const monthDate = new Date(year, month - 1);
+                  const start = startOfWeek(startOfMonth(monthDate));
+                  const end = endOfWeek(endOfMonth(monthDate));
+                  const days = eachDayOfInterval({ start, end });
+
+                  return days.map((day) => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const isCurrentMonth = isSameMonth(day, monthDate);
+                    const dayTransactions = transactions.filter(t => t.date === dateStr);
+                    const hasIncome = dayTransactions.some(t => t.type === 'income');
+                    const hasExpense = dayTransactions.some(t => t.type === 'expense');
+                    const isSelected = selectedDate === dateStr;
+                    const isToday = isSameDay(day, new Date());
+
+                    return (
+                      <button
+                        key={dateStr}
+                        onClick={() => setSelectedDate(dateStr)}
+                        className={`
+                          relative h-10 flex flex-col items-center justify-center rounded-xl transition-all
+                          ${!isCurrentMonth ? 'opacity-20 pointer-events-none' : 'hover:bg-[#fff0f5]'}
+                          ${isSelected ? 'bg-[#ffb6c1] text-white shadow-md scale-105 z-10' : ''}
+                          ${isToday && !isSelected ? 'border-2 border-[#ffb6c1] text-[#ff8da1]' : ''}
+                        `}
+                      >
+                        <span className={`text-xs font-bold ${isSelected ? 'text-white' : isCurrentMonth ? 'text-[#555]' : 'text-[#ccc]'}`}>
+                          {format(day, 'd')}
+                        </span>
+                        <div className="flex gap-0.5 mt-0.5">
+                          {hasIncome && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-[#00ced1]'}`}></div>}
+                          {hasExpense && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-[#ff8da1]'}`}></div>}
+                        </div>
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Selected Date Summary */}
+              {selectedDate && (
+                <div className="mt-4 p-4 bg-[#fffafb] border-2 border-[#ffe4e1] rounded-2xl animate-in slide-in-from-top-2 duration-300">
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="text-xs font-bold text-[#ff8da1] flex items-center gap-1.5">
+                      <Star className="w-3 h-3 fill-[#ff8da1]" />
+                      {selectedDate.split('-')[1]}월 {selectedDate.split('-')[2]}일 현황
+                    </div>
+                    <button onClick={() => setSelectedDate(null)} className="text-[#ccc] hover:text-[#ff8da1]">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  {(() => {
+                    const dayTxs = transactions.filter(t => t.date === selectedDate);
+                    const dayIncome = dayTxs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+                    const dayExpense = dayTxs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+
+                    if (dayTxs.length === 0) {
+                      return <div className="text-center py-2 text-[11px] font-bold text-[#ccc]">내역이 없어요 (ㅠ_ㅠ)</div>;
+                    }
+
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-[#00ced1]">수입</span>
+                          <span className="text-[#00ced1]">+{dayIncome.toLocaleString()}원</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-[#ff8da1]">지출</span>
+                          <span className="text-[#ff8da1]">-{dayExpense.toLocaleString()}원</span>
+                        </div>
+                        <div className="pt-2 border-t border-[#ffe4e1] border-dashed space-y-1.5">
+                          {dayTxs.map(t => (
+                            <div 
+                              key={t.id} 
+                              onClick={() => openEditModal(t)}
+                              className="flex justify-between items-center text-[10px] font-bold text-[#777] hover:text-[#ff8da1] cursor-pointer transition-colors"
+                            >
+                              <div className="flex items-center gap-1 min-w-0">
+                                <span className="shrink-0">·</span>
+                                {t.type === 'expense' && (
+                                  <div className="flex gap-0.5 shrink-0">
+                                    {t.isFixed && <span className="bg-[#ffe4e1] text-[#ff8da1] px-1 rounded-[4px] text-[8px]">고정</span>}
+                                    <span className="bg-[#f5f5f5] text-[#aaa] px-1 rounded-[4px] text-[8px]">{t.paymentMethod === 'card' ? '카드' : '현금'}</span>
+                                  </div>
+                                )}
+                                <span className="truncate">{t.description}</span>
+                              </div>
+                              <span className="shrink-0 ml-2">{t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </section>
+
             {/* Transaction List */}
             <section>
-              <h3 className="text-sm font-bold text-[#ff8da1] mb-4 px-2 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-[#ffb6c1]" /> ♡ 상세 내역 ♡
-              </h3>
-              {monthTransactions.length === 0 ? (
+              <div className="flex items-center justify-between mb-4 px-2">
+                <h3 className="text-sm font-bold text-[#ff8da1] flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-[#ffb6c1]" /> 
+                  {selectedDate ? `♡ ${selectedDate.split('-')[2]}일 내역 ♡` : '♡ 상세 내역 ♡'}
+                </h3>
+                {selectedDate && (
+                  <button 
+                    onClick={() => setSelectedDate(null)}
+                    className="text-[10px] font-bold text-[#ffb6c1] bg-white border border-[#ffe4e1] px-2 py-1 rounded-full hover:bg-[#fff0f5] transition-all"
+                  >
+                    전체 보기
+                  </button>
+                )}
+              </div>
+              
+              {filteredTransactions.length === 0 ? (
                 <div className="text-center py-12 bg-white/60 backdrop-blur-sm border-2 border-[#ffb6c1] border-dashed rounded-[2rem] shadow-[0_4px_20px_rgba(255,182,193,0.2)]">
-                  <div className="text-lg font-bold text-[#ff8da1] mb-3">§ 고생 많았어 §</div>
-                  <div className="text-sm font-bold text-[#ffb6c1] mb-8">♥오늘 하루 푹 쉬어♥</div>
-                  <div className="inline-block bg-gradient-to-r from-[#ffb6c1] to-[#ff99cc] text-white px-4 py-2 text-xs font-bold rounded-full shadow-md animate-pulse">
-                    난 성공할 수 밖에 없어^-^
-                  </div>
+                  <div className="text-lg font-bold text-[#ff8da1] mb-3">§ 내역이 없어 §</div>
+                  <div className="text-sm font-bold text-[#ffb6c1] mb-8">♥기록을 추가해볼까?♥</div>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {monthTransactions.map(t => (
+                  {filteredTransactions.map(t => (
                     <div 
                       key={t.id} 
                       onClick={() => openEditModal(t)}
@@ -258,6 +392,12 @@ export default function App() {
                             {t.type === 'expense' && (
                               <>
                                 <span className="text-[#ddd]">|</span>
+                                {t.isFixed && (
+                                  <>
+                                    <span className="bg-[#ffe4e1] text-[#ff8da1] px-2 py-0.5 rounded-full">고정</span>
+                                    <span className="text-[#ddd]">|</span>
+                                  </>
+                                )}
                                 <span className="bg-[#f5f5f5] px-2 py-0.5 rounded-full">{t.paymentMethod === 'cash' ? '현금' : t.paymentMethod === 'card' ? '카드' : '포인트'}</span>
                               </>
                             )}
