@@ -153,19 +153,12 @@ export default function App() {
                     <h2 className="text-sm font-bold text-[#5c6b56] flex items-center gap-1.5">
                       <Heart className="w-4 h-4 fill-[#ff99cc] text-[#ff99cc]" /> 남은 예산
                     </h2>
-                    {/* Character Image (Mametchi - Stable Wiki URL) */}
-                    <div className="relative">
-                      <img 
-                        src="https://static.wikia.nocookie.net/tamagotchi/images/3/33/Mametchi_anime.png" 
-                        alt="mametchi" 
-                        className="w-14 h-14 object-contain drop-shadow-xl animate-float hover:scale-110 transition-transform cursor-pointer"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          // Fallback to a generic cute icon if the image fails
-                          (e.target as HTMLImageElement).src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png";
-                        }}
-                      />
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-ping opacity-75"></div>
+                    {/* Y2K Sparkles Decoration */}
+                    <div className="relative flex items-center justify-center w-10 h-10">
+                      <Sparkles className="absolute -top-1 -right-1 w-5 h-5 text-yellow-300 animate-ping" />
+                      <Sparkles className="absolute top-2 left-0 w-4 h-4 text-blue-300 animate-bounce delay-75" />
+                      <Sparkles className="absolute -bottom-1 right-2 w-3 h-3 text-[#ff99cc] animate-pulse delay-150" />
+                      <div className="w-1 h-1 bg-white rounded-full absolute top-1 right-3 animate-ping"></div>
                     </div>
                   </div>
                   <button onClick={handleSetBudget} className="text-[11px] font-bold bg-[#e2eedc] text-[#5c6b56] px-2.5 py-1 rounded-full hover:bg-[#d0e4cd] transition-colors">
